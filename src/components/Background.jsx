@@ -1,3 +1,5 @@
+import logoImage from "../assets/logo.png"
+
 const Background = ({ width, height, theme }) => {
   const dashHeight = 10;
   const dashGap = 5;
