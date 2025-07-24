@@ -36,7 +36,7 @@ const Background = ({ width, height, theme }) => {
         src={logoImage}
         style={{
           left: '50%',
-          top: '50%', // lub gdzie chcesz umieścić logo
+          top: '50%',
           transform: 'translate(-50%, -50%)'
         }}
       />

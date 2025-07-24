@@ -140,7 +140,54 @@ const Ball = ({
     }
   }, [musicType, isMobile]);
 
-  const checkPaddleCollision = useCallback((ballX, ballY, ballVelX, isLeft) => {
+  // Funkcja do obliczania realistycznego odbicia od paletki
+  const calculatePaddleReflection = useCallback((ballX, ballY, ballVelX, ballVelY, paddleY, isLeft) => {
+    // Oblicz pozycję kontaktu na paletce (-1 to góra, 0 to środek, 1 to dół)
+    const relativeIntersectY = (ballY - paddleY) / (paddleHeight / 2);
+    
+    // Ograniczamy wartość do zakresu [-1, 1]
+    const normalizedIntersectY = Math.max(-1, Math.min(1, relativeIntersectY));
+    
+    // Maksymalny kąt odbicia (w radianach) - około 60 stopni
+    const maxBounceAngle = Math.PI / 3;
+    
+    // Oblicz kąt odbicia na podstawie miejsca trafienia
+    const bounceAngle = normalizedIntersectY * maxBounceAngle;
+    
+    // Oblicz bazową prędkość (zachowaj energię kinetyczną)
+    const speed = Math.sqrt(ballVelX * ballVelX + ballVelY * ballVelY);
+    
+    // Nowy kierunek X - odwróć w zależności od strony paletki
+    let newDx = Math.cos(bounceAngle) * speed;
+    if (isLeft) {
+      newDx = Math.abs(newDx); // Piłka leci w prawo
+    } else {
+      newDx = -Math.abs(newDx); // Piłka leci w lewo
+    }
+    
+    // Nowy kierunek Y - zależny od kąta odbicia
+    let newDy = Math.sin(bounceAngle) * speed;
+    
+    // Dodaj trochę losowości dla większej nieprzewidywalności (jak w klasycznym Pongu)
+    const randomFactor = 0.1;
+    newDy += (Math.random() - 0.5) * randomFactor * speed;
+    
+    // Minimalna prędkość pozioma, żeby piłka nie leciała zbyt pionowo
+    const minHorizontalSpeed = speed * 0.3;
+    if (Math.abs(newDx) < minHorizontalSpeed) {
+      newDx = newDx >= 0 ? minHorizontalSpeed : -minHorizontalSpeed;
+    }
+    
+    // Ograniczenie maksymalnej prędkości pionowej
+    const maxVerticalSpeed = speed * 0.8;
+    if (Math.abs(newDy) > maxVerticalSpeed) {
+      newDy = newDy >= 0 ? maxVerticalSpeed : -maxVerticalSpeed;
+    }
+    
+    return { dx: newDx, dy: newDy };
+  }, [paddleHeight]);
+
+  const checkPaddleCollision = useCallback((ballX, ballY, ballVelX, ballVelY, isLeft) => {
     const ballRadius = ballSize / 2;
     const paddleY = isLeft ? leftPaddleY : rightPaddleY;
     
@@ -148,8 +195,9 @@ const Ball = ({
       -gameArea.width/2 + paddleWidth/2 + gameArea.width * 0.02 : 
       gameArea.width/2 - paddleWidth/2 - gameArea.width * 0.02;
     
-    if (isLeft && ballVelX >= 0) return false;
-    if (!isLeft && ballVelX <= 0) return false;
+    // Sprawdź czy piłka leci w kierunku paletki
+    if (isLeft && ballVelX >= 0) return null;
+    if (!isLeft && ballVelX <= 0) return null;
     
     const ballLeft = ballX - ballRadius;
     const ballRight = ballX + ballRadius;
@@ -161,9 +209,17 @@ const Ball = ({
     const paddleTop = paddleY - paddleHeight/2;
     const paddleBottom = paddleY + paddleHeight/2;
     
-    return ballRight > paddleLeft && ballLeft < paddleRight &&
-           ballBottom > paddleTop && ballTop < paddleBottom;
-  }, [leftPaddleY, rightPaddleY, gameArea, ballSize, paddleWidth, paddleHeight]);
+    // Sprawdź kolizję
+    const collision = ballRight > paddleLeft && ballLeft < paddleRight &&
+                     ballBottom > paddleTop && ballTop < paddleBottom;
+    
+    if (collision) {
+      // Zwróć nowe prędkości na podstawie miejsca trafienia
+      return calculatePaddleReflection(ballX, ballY, ballVelX, ballVelY, paddleY, isLeft);
+    }
+    
+    return null;
+  }, [leftPaddleY, rightPaddleY, gameArea, ballSize, paddleWidth, paddleHeight, calculatePaddleReflection]);
 
   useEffect(() => {
     const baseSpeed = Math.min(gameArea.width, gameArea.height) * (isMobile ? 0.012 : 0.004);
@@ -194,17 +250,22 @@ const Ball = ({
       let newY = y + dy * speed;
       
       // Check left paddle collision
-      if (checkPaddleCollision(newX, newY, dx, true)) {
-        dx = Math.abs(dx);
+      const leftCollision = checkPaddleCollision(newX, newY, dx, dy, true);
+      if (leftCollision) {
+        dx = leftCollision.dx;
+        dy = leftCollision.dy;
         newX = x + dx * speed;
-        // Use setTimeout to defer sound playing and prevent blocking
+        newY = y + dy * speed;
         setTimeout(() => playSound('paddle'), 0);
       }
       
       // Check right paddle collision
-      if (checkPaddleCollision(newX, newY, dx, false)) {
-        dx = -Math.abs(dx);
+      const rightCollision = checkPaddleCollision(newX, newY, dx, dy, false);
+      if (rightCollision) {
+        dx = rightCollision.dx;
+        dy = rightCollision.dy;
         newX = x + dx * speed;
+        newY = y + dy * speed;
         setTimeout(() => playSound('paddle'), 0);
       }
       
