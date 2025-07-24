@@ -5,7 +5,7 @@ const RightPaddle = ({ gameArea, paddleY, onMove, ballPosition, isMobile, isPaus
   
   const paddleWidth = gameArea.width * 0.02;
   const paddleHeight = gameArea.height * 0.2;
-  const paddleSpeed = gameArea.height * (isMobile ? 0.005 : 0.003);
+  const paddleSpeed = gameArea.height * (isMobile ? 0.010 : 0.007);
 
   useEffect(() => {
     if (isPaused) return;

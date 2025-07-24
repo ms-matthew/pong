@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-
+import ballLogo from '/src/assets/logoBlack.png'
 // Importy plików audio
 import wallSoundFile from '/src/assets/wall.mp3';
 import paddleSoundFile from '/src/assets/paddle.mp3';
@@ -21,8 +21,14 @@ const Ball = ({
   const positionRef = useRef({ x: 0, y: 0 });
   const velocityRef = useRef({ dx: -1, dy: -1 });
   const [renderPosition, setRenderPosition] = useState({ x: 0, y: 0 });
+  const [rotation, setRotation] = useState(0);
+  const rotationRef = useRef(0);
   const animationRef = useRef(null);
   const speedRef = useRef(1);
+  
+  // Nowy ref do liczenia odbić w trakcie jednego punktu
+  const rallyBouncesRef = useRef(0);
+  const baseSpeedRef = useRef(1);
 
   // Web Audio API refs for better performance
   const audioContextRef = useRef(null);
@@ -30,7 +36,7 @@ const Ball = ({
   const gainNodeRef = useRef(null);
   const lastSoundTimeRef = useRef({ wall: 0, paddle: 0 });
 
-  const ballSize = Math.min(gameArea.width, gameArea.height) * (isMobile ? 0.05 : 0.03);
+  const ballSize = Math.min(gameArea.width, gameArea.height) * (isMobile ? 0.07 : 0.05);
   const paddleWidth = gameArea.width * 0.02;
   const paddleHeight = gameArea.height * 0.2;
 
@@ -214,17 +220,69 @@ const Ball = ({
                      ballBottom > paddleTop && ballTop < paddleBottom;
     
     if (collision) {
-      // Zwróć nowe prędkości na podstawie miejsca trafienia
-      return calculatePaddleReflection(ballX, ballY, ballVelX, ballVelY, paddleY, isLeft);
+      // Zwiększ licznik odbić w trakcie rally
+      rallyBouncesRef.current += 1;
+      
+      // Oblicz nową prędkość na podstawie odbicia
+      const newVelocity = calculatePaddleReflection(ballX, ballY, ballVelX, ballVelY, paddleY, isLeft);
+      
+      // Aktualizuj prędkość na podstawie liczby odbić
+      updateSpeedFromRallyBounces();
+      
+      console.log(`Rally bounce #${rallyBouncesRef.current}, Speed: ${speedRef.current.toFixed(3)}`);
+      
+      return newVelocity;
     }
     
     return null;
   }, [leftPaddleY, rightPaddleY, gameArea, ballSize, paddleWidth, paddleHeight, calculatePaddleReflection]);
 
+  // Funkcja do aktualizacji prędkości na podstawie odbić w rally
+  const updateSpeedFromRallyBounces = useCallback(() => {
+    const bounces = rallyBouncesRef.current;
+    
+    // Przyspieszenie na podstawie odbić - stopniowe i kontrolowane
+    let rallySpeedMultiplier = 1;
+    
+    if (bounces >= 3) rallySpeedMultiplier = 1.1;    // +10% po 3 odbiciach
+    if (bounces >= 6) rallySpeedMultiplier = 1.2;    // +20% po 6 odbiciach
+    if (bounces >= 10) rallySpeedMultiplier = 1.35;  // +35% po 10 odbiciach
+    if (bounces >= 15) rallySpeedMultiplier = 1.5;   // +50% po 15 odbiciach
+    if (bounces >= 20) rallySpeedMultiplier = 1.65;  // +65% po 20 odbiciach (max)
+    
+    // Aktualizuj prędkość: bazowa prędkość * rally multiplier
+    speedRef.current = baseSpeedRef.current * rallySpeedMultiplier;
+  }, []);
+
+  // Ulepszone skalowanie prędkości piłki
   useEffect(() => {
-    const baseSpeed = Math.min(gameArea.width, gameArea.height) * (isMobile ? 0.012 : 0.004);
-    speedRef.current = baseSpeed * (playerPoints >= 5 ? 1.5 : 1);
-  }, [playerPoints, gameArea, isMobile]);
+    // Bazowa prędkość skalowana do rozmiaru pola gry
+    const gameAreaSize = Math.sqrt(gameArea.width * gameArea.width + gameArea.height * gameArea.height);
+    const baseSpeedMultiplier = isMobile ? 0.024 : 0.003; // Zmniejszone bo będzie przyspieszać w rally
+    
+    // Normalizacja do standardowego rozmiaru (800x600 = ~1000px diagonal)
+    const standardSize = 1000;
+    const sizeRatio = gameAreaSize / standardSize;
+    
+    // Bazowa prędkość proporcjonalna do rozmiaru gry
+    const baseSpeed = gameAreaSize * baseSpeedMultiplier * sizeRatio;
+    
+    // Progresywne przyspieszenie w trakcie gry (na podstawie punktów)
+    let gameSpeedMultiplier = 1;
+    if (playerPoints >= 3) gameSpeedMultiplier = 1.1;   // +10% po 3 punktach
+    if (playerPoints >= 5) gameSpeedMultiplier = 1.2;   // +20% po 5 punktach  
+    if (playerPoints >= 7) gameSpeedMultiplier = 1.3;   // +30% po 7 punktach
+    if (playerPoints >= 9) gameSpeedMultiplier = 1.4;   // +40% po 9 punktach
+    
+    // Zapisz bazową prędkość (bez rally multiplier)
+    baseSpeedRef.current = baseSpeed * gameSpeedMultiplier;
+    
+    // Ustaw aktualną prędkość (z uwzględnieniem rally)
+    updateSpeedFromRallyBounces();
+    
+    console.log(`Game area: ${gameArea.width}x${gameArea.height}, Base Speed: ${baseSpeedRef.current.toFixed(3)}, Rally bounces: ${rallyBouncesRef.current}`);
+    
+  }, [playerPoints, gameArea, isMobile, updateSpeedFromRallyBounces]);
 
   useEffect(() => {
     if (isPaused) return;
@@ -275,6 +333,11 @@ const Ball = ({
         positionRef.current = { x: 0, y: 0 };
         velocityRef.current = { dx: 1, dy: Math.random() > 0.5 ? 1 : -1 };
         setRenderPosition({ x: 0, y: 0 });
+        rotationRef.current = 0;
+        setRotation(0);
+        // Reset rally bounces po punkcie
+        rallyBouncesRef.current = 0;
+        updateSpeedFromRallyBounces();
         resetPaddles();
         animationRef.current = requestAnimationFrame(update);
         return;
@@ -285,6 +348,11 @@ const Ball = ({
         positionRef.current = { x: 0, y: 0 };
         velocityRef.current = { dx: -1, dy: Math.random() > 0.5 ? 1 : -1 };
         setRenderPosition({ x: 0, y: 0 });
+        rotationRef.current = 0;
+        setRotation(0);
+        // Reset rally bounces po punkcie
+        rallyBouncesRef.current = 0;
+        updateSpeedFromRallyBounces();
         resetPaddles();
         animationRef.current = requestAnimationFrame(update);
         return;
@@ -297,9 +365,15 @@ const Ball = ({
         setTimeout(() => playSound('wall'), 0);
       }
       
+      // Calculate rotation based on ball movement - skalowana do prędkości
+      const totalSpeed = Math.sqrt(dx * dx + dy * dy) * speed;
+      const rotationSpeed = totalSpeed * 0.08; // Zmniejszone z 0.1 dla płynniejszej rotacji
+      rotationRef.current += rotationSpeed;
+      
       positionRef.current = { x: newX, y: newY };
       velocityRef.current = { dx, dy };
       setRenderPosition({ x: newX, y: newY });
+      setRotation(rotationRef.current);
       
       if (onPositionChange) {
         onPositionChange({ x: newX, y: newY });
@@ -315,7 +389,7 @@ const Ball = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [checkPaddleCollision, setPlayerPoints, setComputerPoints, resetPaddles, onPositionChange, gameArea, ballSize, isPaused, playSound, isMobile]);
+  }, [checkPaddleCollision, setPlayerPoints, setComputerPoints, resetPaddles, onPositionChange, gameArea, ballSize, isPaused, playSound, isMobile, updateSpeedFromRallyBounces]);
 
   return (
     <div
@@ -323,9 +397,8 @@ const Ball = ({
       style={{
         width: ballSize,
         height: ballSize,
-        backgroundColor: theme.primary,
-        boxShadow: `0 0 10px ${theme.primary}`,
-        transform: `translate3d(${renderPosition.x}px, ${renderPosition.y}px, 0)`,
+        backgroundColor: '#fff',
+        transform: `translate3d(${renderPosition.x}px, ${renderPosition.y}px, 0) rotate(${rotation}deg)`,
         left: '50%',
         top: '50%',
         marginLeft: -ballSize/2,
@@ -333,7 +406,9 @@ const Ball = ({
         willChange: 'transform',
         backfaceVisibility: 'hidden'
       }}
-    />
+    >
+      <img src={ballLogo} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+    </div>
   );
 };
 

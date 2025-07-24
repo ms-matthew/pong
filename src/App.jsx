@@ -92,18 +92,18 @@ const PLAYERS = {
     name: "Natalia Partyka",
     image: nataliaImage,
     theme: {
-      primary: "#ec4899", // pink-500
-      secondary: "#f9a8d4", // pink-300
-      accent: "#be185d" // pink-700
+      primary: "#06b6d4", // cyan-500
+      secondary: "#67e8f9", // cyan-300
+      accent: "#0891b2" // cyan-600
     }
   },
   andrzej: {
     name: "Andrzej Grubba",
     image: andrzejImage,
     theme: {
-      primary: "#22C55E", // green-500
-      secondary: "#86EFAC", // green-300
-      accent: "#16A34A" // green-600
+      primary: "#06b6d4", // cyan-500
+      secondary: "#67e8f9", // cyan-300
+      accent: "#0891b2" // cyan-600
     }
   },
   custom: {
@@ -150,75 +150,79 @@ function App() {
   const currentTheme = selectedPlayer ? selectedPlayer.theme : PLAYERS.custom.theme;
 
   // Funkcja do obsługi pauzy
-  const togglePause = () => {
-    if (!gameStarted || gameRestarted) return;
+  // Również warto dodać warunek do funkcji togglePause dla dodatkowej ochrony
+
+const togglePause = () => {
+  if (!gameStarted || gameRestarted || countdown > 0) return; // Dodaj countdown > 0
+  
+  console.log('Toggle pause called, current isPaused:', isPaused); // DEBUG
+  
+  if (isPaused) {
+    // Wznów grę z odliczaniem
+    setShowPauseMenu(false);
+    setCountdown(3);
     
-    console.log('Toggle pause called, current isPaused:', isPaused); // DEBUG
-    
-    if (isPaused) {
-      // Wznów grę z odliczaniem
-      setShowPauseMenu(false);
-      setCountdown(3);
+    countdownIntervalRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          setIsPaused(false);
+          clearInterval(countdownIntervalRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  } else {
+    // Pauzuj grę
+    setIsPaused(true);
+    setShowPauseMenu(true);
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+    }
+  }
+};
+
+// Zaktualizowany useEffect dla obsługi klawiszy
+useEffect(() => {
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      // Nie pozwalaj na pauzowanie podczas odliczania
+      if (countdown > 0) return;
+      togglePause();
+    } else if (e.code === 'Space') {
+      e.preventDefault();
       
-      countdownIntervalRef.current = setInterval(() => {
-        setCountdown(prev => {
-          if (prev <= 1) {
-            setIsPaused(false);
-            clearInterval(countdownIntervalRef.current);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      // Pauzuj grę
-      setIsPaused(true);
-      setShowPauseMenu(true);
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
+      if (!gameStarted && !gameRestarted && !selectedPlayer) {
+        startPlayerSelection();
+      } else if (gameRestarted && selectedPlayer) {
+        restartGame();
       }
     }
   };
 
-  // Obsługa klawisza Escape i touch events
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        togglePause();
-      } else if (e.code === 'Space') {
-        e.preventDefault();
-        
-        if (!gameStarted && !gameRestarted && !selectedPlayer) {
-          startPlayerSelection();
-        } else if (gameRestarted && selectedPlayer) {
-          restartGame();
-        }
-      }
-    };
-
-    // Dodajemy obsługę touch events dla mobile
-    const handleTouchEvents = (e) => {
-      // Zapobiegamy propagacji tylko dla przycisków pauzy
-      if (e.target.closest('[data-pause-button]')) {
-        e.stopPropagation();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    if (isMobile) {
-      document.addEventListener('touchstart', handleTouchEvents, { passive: false });
-      document.addEventListener('touchend', handleTouchEvents, { passive: false });
+  // Dodajemy obsługę touch events dla mobile
+  const handleTouchEvents = (e) => {
+    // Zapobiegamy propagacji tylko dla przycisków pauzy
+    if (e.target.closest('[data-pause-button]')) {
+      e.stopPropagation();
     }
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      if (isMobile) {
-        document.removeEventListener('touchstart', handleTouchEvents);
-        document.removeEventListener('touchend', handleTouchEvents);
-      }
-    };
-  }, [gameStarted, gameRestarted, selectedPlayer, isPaused, isMobile]);
+  };
+
+  window.addEventListener('keydown', handleKeyDown);
+  if (isMobile) {
+    document.addEventListener('touchstart', handleTouchEvents, { passive: false });
+    document.addEventListener('touchend', handleTouchEvents, { passive: false });
+  }
+  
+  return () => {
+    window.removeEventListener('keydown', handleKeyDown);
+    if (isMobile) {
+      document.removeEventListener('touchstart', handleTouchEvents);
+      document.removeEventListener('touchend', handleTouchEvents);
+    }
+  };
+}, [gameStarted, gameRestarted, selectedPlayer, isPaused, isMobile, countdown]); // Dodaj countdown do dependencies
 
   // Funkcje do zarządzania muzyką
   const handleMusicChange = (type) => {
@@ -255,88 +259,103 @@ function App() {
     };
   }, [isMobile]);
 
-  useEffect(() => {
-    const updateGameArea = () => {
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      
-      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      const isAndroid = /Android/i.test(navigator.userAgent);
-      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-      
-      const mobile = isTouchDevice && (isAndroid || isIOS || vw < 1024);
-      const portrait = vh > vw;
-      
-      setIsMobile(mobile);
-      setIsPortrait(portrait);
-      
-      if (mobile) {
-        if (portrait) {
-          const headerHeight = 120;
-          const buttonsHeight = 120;
-          const availableHeight = vh - headerHeight - buttonsHeight - 60;
-          const maxWidth = vw * 0.92;
-          
-          let width = Math.min(maxWidth, 350);
-          let height = width * 0.75;
-          
-          if (height > availableHeight) {
-            height = availableHeight;
-            width = height * 1.33;
-          }
-          
-          setGameArea({ width, height });
-        } else {
-          const buttonsWidth = 160;
-          const availableWidth = vw - buttonsWidth - 40;
-          const availableHeight = vh - 40;
-          
-          let width = availableWidth;
-          let height = availableHeight;
-          
-          if (width / height > 1.5) {
-            width = height * 1.5;
-          } else {
-            height = width * 0.67;
-          }
-          
-          setGameArea({ width, height });
+  // Fragment z funkcją updateGameArea - poszerzona wersja dla desktop
+useEffect(() => {
+  const updateGameArea = () => {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    
+    const mobile = isTouchDevice && (isAndroid || isIOS || vw < 1024);
+    const portrait = vh > vw;
+    
+    setIsMobile(mobile);
+    setIsPortrait(portrait);
+    
+    if (mobile) {
+      if (portrait) {
+        const headerHeight = 120;
+        const buttonsHeight = 120;
+        const availableHeight = vh - headerHeight - buttonsHeight - 60;
+        const maxWidth = vw * 0.92;
+        
+        let width = Math.min(maxWidth, 350);
+        let height = width * 0.75;
+        
+        if (height > availableHeight) {
+          height = availableHeight;
+          width = height * 1.33;
         }
+        
+        setGameArea({ width, height });
       } else {
-        const width = Math.min(vw * 0.8, 800);
-        const height = width * 0.75;
+        const buttonsWidth = 160;
+        const availableWidth = vw - buttonsWidth - 40;
+        const availableHeight = vh - 40;
+        
+        let width = availableWidth;
+        let height = availableHeight;
+        
+        if (width / height > 1.5) {
+          width = height * 1.5;
+        } else {
+          height = width * 0.67;
+        }
+        
         setGameArea({ width, height });
       }
-    };
-
-    updateGameArea();
-    window.addEventListener('resize', updateGameArea);
-    window.addEventListener('orientationchange', () => {
-      setTimeout(updateGameArea, 100);
-    });
-
-    const preventScroll = (e) => {
-      e.preventDefault();
-    };
-
-    if (isMobile) {
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
-      document.body.style.height = '100%';
-      document.addEventListener('touchmove', preventScroll, { passive: false });
+    } else {
+      // DESKTOP - Znacznie poszerzona gra
+      const maxWidth = Math.min(vw * 0.9, 1200); // Zwiększone z 800 do 1200
+      const maxHeight = vh * 0.7; // 70% wysokości ekranu
+      
+      // Preferowany stosunek szerokości do wysokości (16:10 zamiast 4:3)
+      const preferredRatio = 1.6;
+      
+      let width = maxWidth;
+      let height = width / preferredRatio;
+      
+      // Jeśli wysokość przekracza dostępną przestrzeń, dostosuj szerokość
+      if (height > maxHeight) {
+        height = maxHeight;
+        width = height * preferredRatio;
+      }
+      
+      setGameArea({ width, height });
     }
+  };
 
-    return () => {
-      window.removeEventListener('resize', updateGameArea);
-      window.removeEventListener('orientationchange', updateGameArea);
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
-      document.body.style.height = '';
-      document.removeEventListener('touchmove', preventScroll);
-    };
-  }, [isMobile]);
+  updateGameArea();
+  window.addEventListener('resize', updateGameArea);
+  window.addEventListener('orientationchange', () => {
+    setTimeout(updateGameArea, 100);
+  });
+
+  const preventScroll = (e) => {
+    e.preventDefault();
+  };
+
+  if (isMobile) {
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.height = '100%';
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+  }
+
+  return () => {
+    window.removeEventListener('resize', updateGameArea);
+    window.removeEventListener('orientationchange', updateGameArea);
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.width = '';
+    document.body.style.height = '';
+    document.removeEventListener('touchmove', preventScroll);
+  };
+}, [isMobile]);
 
   const resetPaddles = () => {
     setLeftPaddleY(0);
@@ -400,7 +419,7 @@ function App() {
     const deltaTime = timestamp - lastUpdateTimeRef.current;
     
     if (deltaTime >= 16) {
-      const paddleSpeed = gameArea.height * 0.018;
+      const paddleSpeed = gameArea.height * 0.025;
       const paddleHeight = gameArea.height * 0.2;
       const maxY = gameArea.height/2 - paddleHeight/2;
       
@@ -633,156 +652,345 @@ function App() {
     </div>
   );
 
-  // Ekran wyboru gracza
-  if (playerSelectionStep) {
-    return (
-      <div className="w-screen flex flex-col items-center md:justify-center sm:justify-start p-2 overflow-hidden" style={{ height: '100vh', ...globalMobileStyles }}>
-        <BackgroundSVG />
-        
-        <div className="text-center mb-4" style={globalMobileStyles}>
-          <h2 className={`font-bold text-white ${isMobile ? 'text-xl' : 'text-4xl'}`}>
-            CHOOSE YOUR PLAYER
-          </h2>
-        </div>
-        
-        <div className={`
-          ${isMobile && !isPortrait ? 'flex flex-row gap-2 max-w-full overflow-x-auto' : 'grid grid-cols-1 md:grid-cols-3 gap-4'} 
-          ${isMobile && isPortrait ? 'w-full max-w-sm' : 'max-w-4xl'}
-        `}>
-          {/* Natalia Partyka */}
-          <div 
-            onClick={() => selectPlayer('natalia')}
-            className={`
-              bg-black/80 p-3 rounded-lg border-2 border-pink-500 cursor-pointer hover:bg-pink-500/10 transition-all transform hover:scale-105
-              ${isMobile && !isPortrait ? 'min-w-[200px] flex-shrink-0' : ''}
-            `}
-            style={buttonStyle}
-          >
-            <div className={`${isMobile ? 'w-16 h-16' : 'w-24 h-24'} mx-auto mb-2 rounded-full border-2 border-pink-500 overflow-hidden`}>
-              <img
-                src={PLAYERS.natalia.image}
-                alt="Natalia Partyka"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <h3 className={`text-pink-400 font-bold ${isMobile ? 'text-sm' : 'text-lg'} mb-1`}>Natalia Partyka</h3>
-            <div className={`text-pink-300 ${isMobile ? 'text-xs' : 'text-sm'}`}>
-              <p>🏓 Paralympic Champion</p>
-              <p>🎨 Pink Theme</p>
-            </div>
-          </div>
-
-          {/* Andrzej Grubba */}
-          <div 
-            onClick={() => selectPlayer('andrzej')}
-            className={`
-              bg-black/80 p-3 rounded-lg border-2 border-green-500 cursor-pointer hover:bg-green-500/10 transition-all transform hover:scale-105
-              ${isMobile && !isPortrait ? 'min-w-[200px] flex-shrink-0' : ''}
-            `}
-            style={buttonStyle}
-          >
-            <div className={`${isMobile ? 'w-16 h-16' : 'w-24 h-24'} mx-auto mb-2 rounded-full border-2 border-green-500 overflow-hidden`}>
-              <img
-                src={PLAYERS.andrzej.image}
-                alt="Andrzej Grubba"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <h3 className={`text-green-400 font-bold ${isMobile ? 'text-sm' : 'text-lg'} mb-1`}>Andrzej Grubba</h3>
-            <div className={`text-green-300 ${isMobile ? 'text-xs' : 'text-sm'}`}>
-              <p>🏓 World Champion</p>
-              <p>🎨 Green Theme</p>
-            </div>
-          </div>
-
-          {/* Custom Player */}
-          <div className={`
-            bg-black/80 p-3 rounded-lg border-2 border-cyan-500
-            ${isMobile && !isPortrait ? 'min-w-[200px] flex-shrink-0' : ''}
-          `}>
-            <div className={`${isMobile ? 'w-16 h-16' : 'w-24 h-24'} mx-auto mb-2 rounded-full border-2 border-cyan-500 overflow-hidden`}>
-              <img
-                src={PLAYERS.custom.image}
-                alt="Custom Player"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <h3 className={`text-cyan-400 font-bold ${isMobile ? 'text-sm' : 'text-lg'} mb-1`}>Custom Player</h3>
-            <input
-              type="text"
-              placeholder="Enter your nick"
-              value={customNick}
-              onChange={(e) => setCustomNick(e.target.value)}
-              className={`
-                w-full p-2 mb-2 bg-gray-800 text-white rounded border border-cyan-500 focus:outline-none focus:border-cyan-400
-                ${isMobile ? 'text-base' : 'text-sm'}
-              `}
-              style={{
-                fontSize: isMobile ? '16px' : 'inherit',
-                ...buttonStyle
-              }}
-              maxLength={12}
-            />
-            <button
-              onClick={() => selectPlayer('custom')}
-              className={`
-                w-full bg-cyan-600 text-white py-2 rounded hover:bg-cyan-700 transition
-                ${isMobile ? 'text-xs' : 'text-sm'}
-              `}
-              style={buttonStyle}
-            >
-              Select
-            </button>
-          </div>
-        </div>
-
-        <button
-          onClick={backToMenu}
+  // Sekcja wyboru gracza - ulepszona wersja
+// Sekcja wyboru gracza - ulepszona wersja dla mobile landscape
+if (playerSelectionStep) {
+  return (
+    <div className="w-screen flex flex-col items-center justify-start overflow-hidden" style={{ height: '100vh', paddingTop: '20px', ...globalMobileStyles }}>
+      <BackgroundSVG />
+      
+      <div className={`text-center ${isMobile && !isPortrait ? 'mb-1' : 'mb-8'}`} style={globalMobileStyles}>
+        <h2 className={`font-bold text-white ${isMobile ? (isPortrait ? 'text-2xl' : 'text-base') : 'text-5xl'}`}>
+          CHOOSE YOUR PLAYER
+        </h2>
+      </div>
+      
+      <div className={`
+        ${isMobile && !isPortrait ? 'flex flex-row gap-2 w-full px-3 justify-center items-center mb-1' : isMobile ? 'flex flex-col gap-4 w-full max-w-sm' : 'grid grid-cols-1 md:grid-cols-3 gap-8'} 
+        ${!isMobile ? 'max-w-6xl w-full' : ''}
+      `}>
+        {/* Natalia Partyka */}
+        <div 
+          onClick={() => selectPlayer('natalia')}
           className={`
-            mt-1 bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 transition
-            ${isMobile ? 'text-sm' : 'text-base'}
+            bg-black/80 rounded-xl border-2 border-cyan-500 cursor-pointer hover:bg-cyan-500/10 transition-all transform hover:scale-105 overflow-hidden
+            ${isMobile && !isPortrait ? 'flex-1 max-w-[180px] h-[160px]' : ''}
+            ${!isMobile ? 'min-h-[400px]' : isMobile && isPortrait ? 'min-h-[120px]' : ''}
           `}
           style={buttonStyle}
         >
-          Back to Menu
-        </button>
-      </div>
-    );
-  }
-
-  // Ekran główny przed grą
-  if (!gameStarted && !gameRestarted) {
-    return (
-      <div className="w-screen flex flex-col items-center sm:justify-start md:justify-center p-4 overflow-hidden" style={{ height: '100vh', ...globalMobileStyles }}>
-        <BackgroundSVG />
-        <div className="text-center mb-6" style={globalMobileStyles}>
-          <h1 className={`font-bold text-white ${isMobile ? 'text-3xl' : 'text-6xl'}`}>
-            PONG
-          </h1>
+          {isMobile ? (
+            isPortrait ? (
+              // Mobile Portrait Layout - poziomy
+              <div className="flex items-center p-4 gap-4">
+                <div className="w-20 h-20 rounded-full border-2 border-cyan-500 overflow-hidden flex-shrink-0">
+                  <img
+                    src={PLAYERS.natalia.image}
+                    alt="Natalia Partyka"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                
+                <div className="flex-1">
+                  <h3 className="text-cyan-400 font-bold text-lg mb-2">
+                    Natalia Partyka
+                  </h3>
+                  <div className="bg-cyan-600 text-white px-3 py-1 rounded-lg">
+                    <p className="font-bold text-center text-sm">
+                      🏓 Paralympic Champion
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Mobile Landscape Layout - super kompaktowy
+              <div className="flex flex-col h-full p-3 items-center justify-center text-center">
+                <div className="w-12 h-12 mb-3 rounded-full border-2 border-cyan-500 overflow-hidden flex-shrink-0">
+                  <img
+                    src={PLAYERS.natalia.image}
+                    alt="Natalia Partyka"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                
+                <h3 className="text-cyan-400 font-bold text-sm mb-2 leading-tight">
+                  Natalia Partyka
+                </h3>
+                
+                <div className="bg-cyan-600 text-white px-2 py-1 rounded text-xs font-bold">
+                  🏓 Paralympic Champion
+                </div>
+              </div>
+            )
+          ) : (
+            // Desktop Layout - pionowy
+            <>
+              <div className="w-full h-64 border-b-2 border-cyan-500 overflow-hidden">
+                <img
+                  src={PLAYERS.natalia.image}
+                  alt="Natalia Partyka"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              
+              <div className="p-6">
+                <h3 className="text-cyan-400 font-bold text-2xl mb-2">
+                  Natalia Partyka
+                </h3>
+                
+                <div className="bg-cyan-600 text-white px-4 py-2 rounded-lg mb-4">
+                  <p className="text-lg font-bold text-center">🏓 Paralympic Champion</p>
+                </div>
+                
+                <div className="text-cyan-300 text-sm space-y-1">
+                  <p>• Multiple Paralympic medals</p>
+                  <p>• World champion in table tennis</p>
+                  <p>• Inspirational athlete</p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
-        <div className="text-center bg-black/80 p-4 rounded-lg border border-cyan-500/80 max-w-sm" style={globalMobileStyles}>
-          <p className={`text-cyan-300 mb-4 font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>
-            {isMobile ? 'Tap to choose player' : 'Press SPACE to choose player'}
-          </p>
-          <div className="text-slate-300 text-xs space-y-1">
-            <p>{isMobile ? 'Use buttons to control paddle' : 'Use ↑ and ↓ arrows'}</p>
-            <p>Playing to 10 points</p>
-            <p className="text-yellow-400">Ball speeds up after 5!</p>
-            <p className="text-purple-400">{isMobile ? 'Tap pause button during game' : 'Press ESC to pause during game'}</p>
-          </div>
-          {isMobile && (
-            <button
-              onClick={startPlayerSelection}
-              style={buttonStyle}
-              className="mt-4 bg-cyan-600 text-white px-4 py-2 rounded-full text-sm hover:bg-cyan-700 transition"
-            >
-              Choose Player
-            </button>
+
+        {/* Andrzej Grubba */}
+        <div 
+          onClick={() => selectPlayer('andrzej')}
+          className={`
+            bg-black/80 rounded-xl border-2 border-cyan-500 cursor-pointer hover:bg-cyan-500/10 transition-all transform hover:scale-105 overflow-hidden
+            ${isMobile && !isPortrait ? 'flex-1 max-w-[180px] h-[160px]' : ''}
+            ${!isMobile ? 'min-h-[400px]' : isMobile && isPortrait ? 'min-h-[120px]' : ''}
+          `}
+          style={buttonStyle}
+        >
+          {isMobile ? (
+            isPortrait ? (
+              // Mobile Portrait Layout - poziomy
+              <div className="flex items-center p-4 gap-4">
+                <div className="w-20 h-20 rounded-full border-2 border-cyan-500 overflow-hidden flex-shrink-0">
+                  <img
+                    src={PLAYERS.andrzej.image}
+                    alt="Andrzej Grubba"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                
+                <div className="flex-1">
+                  <h3 className="text-cyan-400 font-bold text-lg mb-2">
+                    Andrzej Grubba
+                  </h3>
+                  <div className="bg-cyan-600 text-white px-3 py-1 rounded-lg">
+                    <p className="font-bold text-center text-sm">
+                      🏓 World Champion
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Mobile Landscape Layout - super kompaktowy
+              <div className="flex flex-col h-full p-3 items-center justify-center text-center">
+                <div className="w-12 h-12 mb-3 rounded-full border-2 border-cyan-500 overflow-hidden flex-shrink-0">
+                  <img
+                    src={PLAYERS.andrzej.image}
+                    alt="Andrzej Grubba"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                
+                <h3 className="text-cyan-400 font-bold text-sm mb-2 leading-tight">
+                  Andrzej Grubba
+                </h3>
+                
+                <div className="bg-cyan-600 text-white px-2 py-1 rounded text-xs font-bold">
+                  🏓 World Champion
+                </div>
+              </div>
+            )
+          ) : (
+            // Desktop Layout - pionowy
+            <>
+              <div className="w-full h-64 border-b-2 border-cyan-500 overflow-hidden">
+                <img
+                  src={PLAYERS.andrzej.image}
+                  alt="Andrzej Grubba"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              
+              <div className="p-6">
+                <h3 className="text-cyan-400 font-bold text-2xl mb-2">
+                  Andrzej Grubba
+                </h3>
+                
+                <div className="bg-cyan-600 text-white px-4 py-2 rounded-lg mb-4">
+                  <p className="text-lg font-bold text-center">🏓 World Champion</p>
+                </div>
+                
+                <div className="text-cyan-300 text-sm space-y-1">
+                  <p>• Polish table tennis legend</p>
+                  <p>• Multiple world championships</p>
+                  <p>• Olympic medalist</p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Custom Player */}
+        <div className={`
+          bg-black/80 rounded-xl border-2 border-cyan-500 overflow-hidden
+          ${isMobile && !isPortrait ? 'flex-1 max-w-[180px] h-[160px]' : ''}
+          ${!isMobile ? 'min-h-[400px]' : isMobile && isPortrait ? 'min-h-[140px]' : ''}
+        `}>
+          {isMobile ? (
+            isPortrait ? (
+              // Mobile Portrait Layout - poziomy z inputem
+              <div className="flex items-center p-4 gap-4">
+                <div className="w-20 h-20 rounded-full border-2 border-cyan-500 overflow-hidden flex-shrink-0">
+                  <img
+                    src={PLAYERS.custom.image}
+                    alt="Custom Player"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                
+                <div className="flex-1">
+                  <h3 className="text-cyan-400 font-bold text-lg mb-2">
+                    Custom Player
+                  </h3>
+                  <div className="bg-cyan-600 text-white px-3 py-1 rounded-lg mb-2">
+                    <p className="font-bold text-center text-sm">
+                      🏓 Future Champion
+                    </p>
+                  </div>
+                  
+                  <input
+                    type="text"
+                    placeholder="Enter your nick"
+                    value={customNick}
+                    onChange={(e) => setCustomNick(e.target.value)}
+                    className="w-full p-2 mb-2 bg-gray-800 text-white rounded border border-cyan-500 focus:outline-none focus:border-cyan-400 text-sm"
+                    style={{
+                      fontSize: '16px',
+                      ...buttonStyle
+                    }}
+                    maxLength={12}
+                  />
+                  
+                  <button
+                    onClick={() => selectPlayer('custom')}
+                    className="w-full bg-cyan-600 text-white py-1 rounded hover:bg-cyan-700 transition font-bold text-sm"
+                    style={buttonStyle}
+                  >
+                    Select
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Mobile Landscape Layout - super kompaktowy z inputem
+              <div className="flex flex-col h-full p-2 items-center justify-center text-center">
+                <div className="w-10 h-10 mb-2 rounded-full border-2 border-cyan-500 overflow-hidden flex-shrink-0">
+                  <img
+                    src={PLAYERS.custom.image}
+                    alt="Custom Player"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                
+                <h3 className="text-cyan-400 font-bold text-xs mb-1 leading-tight">
+                  Custom Player
+                </h3>
+                
+                <div className="bg-cyan-600 text-white px-1 py-0.5 rounded text-xs font-bold mb-2">
+                  🏓 Future Champion
+                </div>
+                
+                <input
+                  type="text"
+                  placeholder="Nick"
+                  value={customNick}
+                  onChange={(e) => setCustomNick(e.target.value)}
+                  className="w-full p-1 mb-1 bg-gray-800 text-white rounded border border-cyan-500 focus:outline-none focus:border-cyan-400 text-xs text-center"
+                  style={{
+                    fontSize: '16px',
+                    ...buttonStyle
+                  }}
+                  maxLength={12}
+                />
+                
+                <button
+                  onClick={() => selectPlayer('custom')}
+                  className="w-full bg-cyan-600 text-white py-1 rounded hover:bg-cyan-700 transition font-bold text-xs"
+                  style={buttonStyle}
+                >
+                  Select
+                </button>
+              </div>
+            )
+          ) : (
+            // Desktop Layout - pionowy
+            <>
+              <div className="w-full h-64 border-b-2 border-cyan-500 overflow-hidden">
+                <img
+                  src={PLAYERS.custom.image}
+                  alt="Custom Player"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              
+              <div className="p-6">
+                <h3 className="text-cyan-400 font-bold text-2xl mb-2">
+                  Custom Player
+                </h3>
+                
+                <div className="bg-cyan-600 text-white px-4 py-2 rounded-lg mb-4">
+                  <p className="text-lg font-bold text-center">🏓 Future Champion</p>
+                </div>
+                
+                <div className="text-cyan-300 text-sm mt-4 space-y-1">
+                  <p>• Create your own legend</p>
+                  <p>• Customize your experience</p>
+                  <p>• Rise to greatness</p>
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Enter your nick"
+                  value={customNick}
+                  onChange={(e) => setCustomNick(e.target.value)}
+                  className="w-full p-2 mb-2 bg-gray-800 text-white rounded border border-cyan-500 focus:outline-none focus:border-cyan-400 text-lg"
+                  style={{
+                    fontSize: 'inherit',
+                    ...buttonStyle
+                  }}
+                  maxLength={12}
+                />
+                
+                <button
+                  onClick={() => selectPlayer('custom')}
+                  className="w-full bg-cyan-600 text-white py-2 rounded hover:bg-cyan-700 transition font-bold text-lg"
+                  style={buttonStyle}
+                >
+                  Select Player
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>
-    );
-  }
+
+      <button
+        onClick={backToMenu}
+        className={`
+          bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition font-bold mt-4
+          ${isMobile && !isPortrait ? 'text-sm' : isMobile ? 'text-base' : 'text-lg'}
+        `}
+        style={buttonStyle}
+      >
+        Back to Menu
+      </button>
+    </div>
+  );
+}
 
   if (gameRestarted) {
     const didPlayerWin = finalPlayerPoints === 10;
@@ -871,6 +1079,42 @@ function App() {
       </div>
     );
   }
+
+  // Dodaj ten kod tuż przed końcowym return (przed sekcją gry)
+
+// Ekran główny przed grą
+if (!gameStarted && !gameRestarted) {
+  return (
+    <div className="w-screen flex flex-col items-center sm:justify-start md:justify-center p-4 overflow-hidden" style={{ height: '100vh', ...globalMobileStyles }}>
+      <BackgroundSVG />
+      <div className="text-center mb-6" style={globalMobileStyles}>
+        <h1 className={`font-bold text-white ${isMobile ? 'text-3xl' : 'text-6xl'}`}>
+          PONG
+        </h1>
+      </div>
+      <div className="text-center bg-black/80 p-4 rounded-lg border border-cyan-500/80 max-w-sm" style={globalMobileStyles}>
+        <p className={`text-cyan-300 mb-4 font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>
+          {isMobile ? 'Tap to choose player' : 'Press SPACE to choose player'}
+        </p>
+        <div className="text-slate-300 text-xs space-y-1">
+          <p>{isMobile ? 'Use buttons to control paddle' : 'Use ↑ and ↓ arrows'}</p>
+          <p>Playing to 10 points</p>
+          <p className="text-yellow-400">Ball speeds up after 5!</p>
+          <p className="text-purple-400">{isMobile ? 'Tap pause button during game' : 'Press ESC to pause during game'}</p>
+        </div>
+        {isMobile && (
+          <button
+            onClick={startPlayerSelection}
+            style={buttonStyle}
+            className="mt-4 bg-cyan-600 text-white px-4 py-2 rounded-full text-sm hover:bg-cyan-700 transition"
+          >
+            Choose Player
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
   return (
     <div className="w-screen flex flex-col overflow-hidden" style={{ height: '100vh', ...globalMobileStyles }}>

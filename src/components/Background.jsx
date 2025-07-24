@@ -5,15 +5,35 @@ const Background = ({ width, height, theme }) => {
   const dashGap = 5;
   const centerLineHeight = height;
 
+  // Oblicz rozmiar logo - proporcjonalny do rozmiaru pola gry
+  const logoSize = Math.min(width, height) * 0.9;
+
   return (
     <div
-      className="bg-black border-2 relative"
+      className="bg-black border-4 relative"
       style={{ 
         width, 
         height,
         borderColor: theme.primary
       }}
     >
+      {/* Logo w tle */}
+      <img 
+        className="absolute opacity-8 select-none pointer-events-none" 
+        src={logoImage}
+        alt="Logo"
+        style={{
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: logoSize,
+          height: logoSize,
+          objectFit: 'contain', // Zachowuje proporcje logo
+          zIndex: 1
+        }}
+      />
+      
+      {/* Centralna linia - nad logo */}
       <div
         className="absolute opacity-50"
         style={{
@@ -28,16 +48,8 @@ const Background = ({ width, height, theme }) => {
             ${theme.primary} ${dashHeight}px,
             transparent ${dashHeight}px,
             transparent ${dashHeight + dashGap}px
-          )`
-        }}
-      />
-      <img 
-        className="absolute z-10 opacity-5" 
-        src={logoImage}
-        style={{
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)'
+          )`,
+          zIndex: 2 // Linia nad logo
         }}
       />
     </div>
