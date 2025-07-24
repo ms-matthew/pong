@@ -4,12 +4,11 @@ import Ball from './components/Ball';
 import LeftPaddle from './components/LeftPaddle';
 import RightPaddle from './components/RightPaddle';
 import './index.css';
-import ShinyText from './ShinyText';
 import AudioManager from './components/AudioManager';
-
 import andrzejImage from '/src/assets/andrzej_grubba.jpg'
 import nataliaImage from '/src/assets/Natalia_Partyka_Rio_2016.jpg'
 import customImage from '/src/assets/custom.png'
+
 
 
 // Ikony muzyczne - wersja kompaktowa dla landscape
@@ -641,10 +640,9 @@ function App() {
         <BackgroundSVG />
         
         <div className="text-center mb-4" style={globalMobileStyles}>
-          <ShinyText 
-            text="CHOOSE YOUR PLAYER" 
-            className={`font-bold ${isMobile ? 'text-xl' : 'text-4xl'}`}
-          />
+          <h2 className={`font-bold text-white ${isMobile ? 'text-xl' : 'text-4xl'}`}>
+            CHOOSE YOUR PLAYER
+          </h2>
         </div>
         
         <div className={`
@@ -758,10 +756,9 @@ function App() {
       <div className="w-screen flex flex-col items-center sm:justify-start md:justify-center p-4 overflow-hidden" style={{ height: '100vh', ...globalMobileStyles }}>
         <BackgroundSVG />
         <div className="text-center mb-6" style={globalMobileStyles}>
-          <ShinyText 
-            text="PONG" 
-            className={`font-bold ${isMobile ? 'text-3xl' : 'text-6xl'}`}
-          />
+          <h1 className={`font-bold text-white ${isMobile ? 'text-3xl' : 'text-6xl'}`}>
+            PONG
+          </h1>
         </div>
         <div className="text-center bg-black/80 p-4 rounded-lg border border-cyan-500/80 max-w-sm" style={globalMobileStyles}>
           <p className={`text-cyan-300 mb-4 font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>
@@ -795,10 +792,9 @@ function App() {
         <BackgroundSVG />
         {isMobile ? <div/> : 
           <div className="text-center p-2 md:p-8" style={globalMobileStyles}>
-            <ShinyText 
-              text="PONG" 
-              className={`font-bold ${isMobile ? 'text-3xl' : 'text-6xl'}`}
-            />
+            <h1 className={`font-bold text-white ${isMobile ? 'text-3xl' : 'text-6xl'}`}>
+              PONG
+            </h1>
           </div>  
         }
         
@@ -892,10 +888,9 @@ function App() {
       {(!isMobile || isPortrait) && (
         <>
           <div className="text-center py-2 flex-shrink-0" style={globalMobileStyles}>
-            <ShinyText 
-              text="PONG" 
-              className={`font-bold ${isMobile ? 'text-2xl' : 'text-4xl'}`}
-            />
+            <h1 className={`font-bold text-white ${isMobile ? 'text-3xl' : 'text-6xl'}`}>
+              PONG
+            </h1>
             
             {selectedPlayer && (
               <div className="flex items-center justify-center gap-3 mt-3">
