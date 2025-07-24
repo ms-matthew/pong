@@ -1,4 +1,4 @@
-import logoImage from "../assets/logo.png"
+import logoImage from "/src/assets/logo.png"
 
 const Background = ({ width, height, theme }) => {
   const dashHeight = 10;
@@ -33,7 +33,7 @@ const Background = ({ width, height, theme }) => {
       />
       <img 
         className="absolute z-10 opacity-5" 
-        src="src/assets/logo.png"
+        src={logoImage}
         style={{
           left: '50%',
           top: '50%', // lub gdzie chcesz umieścić logo
